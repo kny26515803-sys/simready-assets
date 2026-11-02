@@ -1,0 +1,38 @@
+#usda 1.0
+(
+    defaultPrim = "SimReady_Sample_Model"
+    metersPerUnit = 1.0
+    upAxis = "Y"
+    doc = "NVIDIA SimReady Minimal Prototype Sample Asset"
+)
+
+def Xform "SimReady_Sample_Model" (
+    prepend apiSchemas = ["PhysicsRigidBodyAPI", "PhysicsMassAPI"]
+)
+{
+    float physics:mass = 14.5
+    bool physics:rigidBodyEnabled = 1
+
+    def Cube "Chassis" (
+        prepend apiSchemas = ["PhysicsCollisionAPI"]
+    )
+    {
+        double size = 1.2
+        double3 xformOp:scale = (1.0, 0.666, 1.0)
+        double3 xformOp:translate = (0, 0.4, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        color3f[] primvars:displayColor = [(0.46, 0.72, 0.0)]
+    }
+
+    def Cube "SensorTurret" (
+        prepend apiSchemas = ["PhysicsCollisionAPI"]
+    )
+    {
+        double size = 0.6
+        double3 xformOp:scale = (1.0, 0.75, 1.0)
+        double3 xformOp:translate = (0, 1.025, 0)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+        color3f[] primvars:displayColor = [(0.22, 0.25, 0.30)]
+    }
+}
+

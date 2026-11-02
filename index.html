@@ -1,0 +1,1583 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NVIDIA SimReady — Sim-to-Real 워크셀 시뮬레이터 & 2,677 에셋 팜플렛</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      overflow: hidden;
+      background: #0b0e12;
+      color: #e6edf3;
+      font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", Roboto, sans-serif;
+      user-select: none;
+    }
+
+    #app {
+      display: flex;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* Left: 3D Sim-to-Real Workcell Viewport */
+    #viewport {
+      position: relative;
+      flex: 1;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    /* Right: Digital Pamphlet Dashboard */
+    #pamphlet {
+      width: 540px;
+      height: 100%;
+      background: #12161c;
+      border-left: 1px solid #28303d;
+      display: flex;
+      flex-direction: column;
+      z-index: 20;
+      transition: width 0.25s ease;
+    }
+    #pamphlet.expanded {
+      width: 68vw;
+    }
+
+    /* Left HUD — Sim-to-Real Control & Telemetry */
+    #hud {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      background: rgba(13, 17, 23, 0.90);
+      border: 1px solid rgba(118, 185, 0, 0.55);
+      border-radius: 12px;
+      padding: 14px 16px;
+      backdrop-filter: blur(8px);
+      width: 375px;
+      box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+      z-index: 10;
+    }
+    .hud-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .badge {
+      display: inline-block;
+      background: #76b900;
+      color: #090c10;
+      font-weight: 800;
+      font-size: 10.5px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      letter-spacing: 0.4px;
+    }
+    .cam-btn {
+      background: #1f2631;
+      color: #c9d1d9;
+      border: 1px solid #353f4f;
+      border-radius: 5px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .cam-btn.active {
+      border-color: #76b900;
+      color: #76b900;
+    }
+
+    #sim-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: #fff;
+      margin-bottom: 3px;
+    }
+    .sim-desc {
+      font-size: 11.5px;
+      color: #9da7b3;
+      line-height: 1.5;
+      margin-bottom: 10px;
+    }
+    .sim-desc b { color: #e6edf3; }
+
+    /* Control Pad inside HUD */
+    .control-box {
+      background: #161c24;
+      border: 1px solid #262f3d;
+      border-radius: 8px;
+      padding: 9px 11px;
+      margin-bottom: 10px;
+      font-size: 11.5px;
+    }
+    .ctrl-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .ctrl-row:last-child { margin-bottom: 0; }
+    .kbd {
+      display: inline-block;
+      background: #252e3a;
+      border: 1px solid #3b4656;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-family: monospace;
+      font-size: 11px;
+      font-weight: 700;
+      color: #76b900;
+    }
+    #fork-slider {
+      width: 120px;
+      accent-color: #76b900;
+      cursor: pointer;
+    }
+
+    /* Telemetry Grid */
+    .telemetry-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .t-item {
+      background: #11161d;
+      border: 1px solid #212832;
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 11px;
+      color: #8b949e;
+      font-variant-numeric: tabular-nums;
+    }
+    .t-item b {
+      display: block;
+      font-size: 13px;
+      color: #f0f6fc;
+      margin-top: 2px;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+    .action-row:last-child { margin-bottom: 0; }
+
+    .btn-ai {
+      flex: 1.4;
+      background: linear-gradient(135deg, #76b900 0%, #589400 100%);
+      color: #070a0d;
+      border: none;
+      border-radius: 7px;
+      padding: 9px 10px;
+      font-weight: 800;
+      font-size: 12px;
+      cursor: pointer;
+      transition: filter 0.15s, transform 0.1s;
+    }
+    .btn-ai:hover { filter: brightness(1.1); }
+    .btn-ai.running {
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      color: #090c10;
+    }
+    .btn-sub {
+      flex: 1;
+      background: #1f2733;
+      color: #d0d7de;
+      border: 1px solid #344052;
+      border-radius: 7px;
+      padding: 8px 8px;
+      font-weight: 700;
+      font-size: 11.5px;
+      cursor: pointer;
+    }
+    .btn-sub:hover { border-color: #76b900; color: #fff; }
+
+    /* Loading Overlay */
+    #loading-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(11, 14, 18, 0.80);
+      backdrop-filter: blur(4px);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 30;
+      text-align: center;
+      padding: 20px;
+    }
+    .spinner {
+      width: 42px;
+      height: 42px;
+      border: 4px solid rgba(118,185,0,0.25);
+      border-top-color: #76b900;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 14px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading-text { font-size: 14px; font-weight: 700; color: #fff; margin-bottom: 6px; }
+    #loading-sub { font-size: 12px; color: #9da7b3; }
+
+    /* Pamphlet Header */
+    .pamphlet-header {
+      padding: 14px 16px 10px;
+      border-bottom: 1px solid #262c36;
+      background: #161b22;
+      flex-shrink: 0;
+    }
+    .pamphlet-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .pamphlet-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .expand-btn {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .expand-btn:hover { border-color: #76b900; color: #fff; }
+
+    .disk-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #0d1117;
+      border: 1px solid #21262d;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 11px;
+      color: #8b949e;
+      margin-bottom: 9px;
+    }
+    .disk-bar b { color: #76b900; }
+    .clean-btn {
+      background: #21262d;
+      color: #f85149;
+      border: 1px solid rgba(248,81,73,0.35);
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+    .clean-btn:hover { background: rgba(248,81,73,0.18); }
+
+    .search-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 9px;
+    }
+    #search-input {
+      flex: 1;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 8px 11px;
+      color: #fff;
+      font-size: 12px;
+      outline: none;
+    }
+    #search-input:focus { border-color: #76b900; }
+
+    .cat-tabs {
+      display: flex;
+      gap: 5px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: thin;
+    }
+    .cat-tab {
+      background: #21262d;
+      color: #8b949e;
+      border: 1px solid #30363d;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .cat-tab:hover { color: #e6edf3; }
+    .cat-tab.active {
+      background: #76b900;
+      color: #090c10;
+      border-color: #76b900;
+      font-weight: 800;
+    }
+
+    /* Pamphlet Grid — FIXED HEIGHT & NON-COLLAPSING ROWS */
+    #catalog-grid {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(225px, 1fr));
+      grid-auto-rows: max-content;
+      gap: 12px;
+      align-content: start;
+    }
+    .asset-card {
+      background: #171c24;
+      border: 1px solid #2b3442;
+      border-radius: 10px;
+      min-height: 268px;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.14s, border-color 0.14s, box-shadow 0.14s;
+    }
+    .asset-card:hover {
+      border-color: #76b900;
+      transform: translateY(-2px);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+    }
+    .asset-card.is-installed {
+      border-color: rgba(118, 185, 0, 0.65);
+    }
+
+    .thumb-wrap {
+      position: relative;
+      width: 100%;
+      height: 145px;
+      min-height: 145px;
+      background: radial-gradient(circle at 50% 45%, #263040 0%, #12171f 100%);
+      border-bottom: 1px solid #232b36;
+      border-radius: 9px 9px 0 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .thumb-img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      padding: 8px;
+      z-index: 2;
+    }
+    .thumb-fallback {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 10px;
+      z-index: 1;
+      color: #8b949e;
+      background-image:
+        linear-gradient(rgba(118,185,0,0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(118,185,0,0.06) 1px, transparent 1px);
+      background-size: 16px 16px;
+    }
+    .thumb-fallback-icon {
+      font-size: 36px;
+      margin-bottom: 4px;
+    }
+    .thumb-fallback-tag {
+      font-size: 10px;
+      color: #76b900;
+      font-family: monospace;
+    }
+
+    .status-pill {
+      position: absolute;
+      top: 7px;
+      right: 7px;
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 7px;
+      border-radius: 4px;
+      z-index: 3;
+    }
+    .pill-ready {
+      background: #76b900;
+      color: #090c10;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+    .pill-cloud {
+      background: rgba(13, 17, 23, 0.82);
+      color: #9da7b3;
+      border: 1px solid #353f4e;
+    }
+
+    .card-body {
+      padding: 10px 11px 11px;
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+    .card-cat {
+      font-size: 10.5px;
+      color: #76b900;
+      font-weight: 700;
+      margin-bottom: 3px;
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: #f0f6fc;
+      margin-bottom: 2px;
+      line-height: 1.3;
+    }
+    .card-id {
+      font-size: 10px;
+      color: #7d8590;
+      font-family: monospace;
+      margin-bottom: 6px;
+      word-break: break-all;
+    }
+    .card-specs {
+      font-size: 10.5px;
+      color: #9da7b3;
+      margin-bottom: 9px;
+      margin-top: auto;
+      background: #11151c;
+      padding: 4px 7px;
+      border-radius: 4px;
+      border: 1px solid #212733;
+    }
+    .card-actions {
+      display: flex;
+      gap: 5px;
+    }
+    .btn-load {
+      flex: 1;
+      background: #238636;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 7px 8px;
+      font-size: 11px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+    .btn-load.is-ready {
+      background: #76b900;
+      color: #090c10;
+    }
+    .btn-load:hover { filter: brightness(1.12); }
+
+    .btn-hf {
+      background: #21262d;
+      color: #c9d1d9;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 7px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+    }
+    .btn-hf:hover { border-color: #76b900; color: #fff; }
+
+    #load-more-bar {
+      padding: 10px 14px;
+      border-top: 1px solid #262c36;
+      background: #161b22;
+      font-size: 12px;
+      color: #8b949e;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .more-btn {
+      background: #21262d;
+      color: #e6edf3;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 5px 12px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .more-btn:hover { border-color: #76b900; }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.164.1/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.164.1/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app">
+    <!-- Left: Sim-to-Real Digital Twin Workcell Simulator -->
+    <div id="viewport">
+      <div id="hud">
+        <div class="hud-top">
+          <span class="badge">SIM-TO-REAL WORKCELL</span>
+          <div>
+            <button class="cam-btn active" id="cam-orbit-btn">🎥 자유 시점</button>
+            <button class="cam-btn" id="cam-chase-btn">🚜 지게차 추적</button>
+          </div>
+        </div>
+
+        <div id="sim-title">물류창고 피지컬 AI 디지털 트윈 워크셀</div>
+        <div class="sim-desc">
+          실제 지게차 조향·주행·유압 포크 리프팅 물리 및 팔레트 화물 적재/자율주행 실험 환경입니다.
+        </div>
+
+        <div class="control-box">
+          <div class="ctrl-row">
+            <span>🚜 <b>지게차 주행 / 조향</b></span>
+            <span><span class="kbd">W</span><span class="kbd">S</span> 전후진 · <span class="kbd">A</span><span class="kbd">D</span> 조향</span>
+          </div>
+          <div class="ctrl-row">
+            <span>🏗️ <b>유압 포크 리프트</b> (<span class="kbd">R</span>상승 / <span class="kbd">F</span>하강)</span>
+            <input type="range" id="fork-slider" min="0" max="1.15" step="0.01" value="0.02" />
+          </div>
+          <div class="ctrl-row">
+            <span>📦 <b>화물 적재 상태</b></span>
+            <b id="cargo-status" style="color:#9da7b3;">포크 대기 중 (팔레트 하단 진입 시 자동 결속)</b>
+          </div>
+        </div>
+
+        <div class="telemetry-grid">
+          <div class="t-item">제어 모드 (Mode)<b id="st-mode" style="color:#76b900;">MANUAL TELEOP</b></div>
+          <div class="t-item">주행 속도 / 조향각<b id="st-speed">0.00 m/s | 0.0°</b></div>
+          <div class="t-item">포크 고도 (Fork Z)<b id="st-fork">0.02 m</b></div>
+          <div class="t-item">총 중량 (차체+적재하중)<b id="st-mass">245.1 kg (+0.0 kg)</b></div>
+        </div>
+
+        <div class="action-row">
+          <button class="btn-ai" id="ai-mission-btn">🤖 AI 자율 피킹·하역 실험 시작</button>
+        </div>
+        <div class="action-row">
+          <button class="btn-sub" id="drop-all-btn">💥 전체 중력 낙하 [SPACE]</button>
+          <button class="btn-sub" id="reset-sim-btn">🔄 작업장 원위치</button>
+        </div>
+      </div>
+
+      <div id="loading-overlay">
+        <div class="spinner"></div>
+        <div id="loading-text">SimReady 에셋을 워크셀 환경에 불러오는 중...</div>
+        <div id="loading-sub">OpenUSD 기하 구조 및 물리 강체(Rigid Body) 속성을 바인딩합니다</div>
+      </div>
+    </div>
+
+    <!-- Right: 2,677-Item Digital Pamphlet -->
+    <div id="pamphlet">
+      <div class="pamphlet-header">
+        <div class="pamphlet-title-row">
+          <div class="pamphlet-title">📘 SimReady 2,677종 에셋 팜플렛</div>
+          <button class="expand-btn" id="toggle-width-btn">↔ 팜플렛 넓게 보기</button>
+        </div>
+
+        <div class="disk-bar">
+          <span>💾 여유 용량: <b id="free-gb">9.9</b> GB | 설치된 에셋(5종): <b id="cache-mb">12.7</b> MB</span>
+          <button class="clean-btn" id="clean-cache-btn">🧹 추가 캐시 정리</button>
+        </div>
+
+        <div class="search-row">
+          <input type="text" id="search-input" placeholder="🔍 품목 검색 (예: 지게차, 로봇, 팔레트, 컨베이어, 박스, forklift, robot...)" />
+        </div>
+
+        <div class="cat-tabs" id="cat-tabs"></div>
+      </div>
+
+      <div id="catalog-grid"></div>
+
+      <div id="load-more-bar">
+        <span id="showing-count">표시 중: 0 / 0</span>
+        <button class="more-btn" id="more-btn">더 많은 품목 보기 (+60개)</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    // =========================================================================
+    // 1. THREE.JS WORKCELL SCENE & LIGHTING SETUP
+    // =========================================================================
+    const viewport = document.getElementById('viewport');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0b0e12);
+    scene.fog = new THREE.FogExp2(0x0b0e12, 0.022);
+
+    const camera = new THREE.PerspectiveCamera(45, viewport.clientWidth / viewport.clientHeight, 0.1, 120);
+    camera.position.set(4.8, 3.8, 5.2);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.18;
+    viewport.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.target.set(0.5, 0.6, 0.5);
+
+    scene.add(new THREE.AmbientLight(0xdbe6f5, 0.95));
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 2.6);
+    dirLight.position.set(6, 11, 7);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.set(2048, 2048);
+    dirLight.shadow.camera.near = 0.5;
+    dirLight.shadow.camera.far = 35;
+    const sd = 8;
+    dirLight.shadow.camera.left = -sd;
+    dirLight.shadow.camera.right = sd;
+    dirLight.shadow.camera.top = sd;
+    dirLight.shadow.camera.bottom = -sd;
+    dirLight.shadow.bias = -0.0005;
+    scene.add(dirLight);
+
+    const rimLight = new THREE.DirectionalLight(0x76b900, 0.5);
+    rimLight.position.set(-6, 4, -5);
+    scene.add(rimLight);
+
+    // Industrial Workcell Floor, Grid, Zones
+    const gridHelper = new THREE.GridHelper(20, 20, 0x76b900, 0x1e2631);
+    scene.add(gridHelper);
+
+    const axesHelper = new THREE.AxesHelper(1.2);
+    axesHelper.position.set(-4.5, 0.01, -4.5);
+    scene.add(axesHelper);
+
+    const floorMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(20, 20),
+      new THREE.MeshStandardMaterial({ color: 0x12161c, roughness: 0.85, metalness: 0.1 })
+    );
+    floorMesh.rotation.x = -Math.PI / 2;
+    floorMesh.position.y = -0.002;
+    floorMesh.receiveShadow = true;
+    scene.add(floorMesh);
+
+    // Zone Markings (Zone A: Loading Zone, Zone B: Target Drop Zone)
+    function createZonePad(x, z, w, d, colorHex) {
+      const group = new THREE.Group();
+      group.position.set(x, 0.003, z);
+      const border = new THREE.Mesh(
+        new THREE.RingGeometry(0.68, 0.74, 4),
+        new THREE.MeshBasicMaterial({ color: colorHex, side: THREE.DoubleSide })
+      );
+      border.rotation.x = -Math.PI / 2;
+      border.rotation.z = Math.PI / 4;
+      border.scale.set(w, d, 1);
+      group.add(border);
+
+      const fill = new THREE.Mesh(
+        new THREE.PlaneGeometry(w * 0.95, d * 0.95),
+        new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.10, side: THREE.DoubleSide })
+      );
+      fill.rotation.x = -Math.PI / 2;
+      group.add(fill);
+      scene.add(group);
+    }
+    createZonePad(0.0, 2.2, 1.6, 1.3, 0xf59e0b); // Zone A: Pickup Pallet Zone (Amber)
+    createZonePad(2.6, 2.2, 1.6, 1.3, 0x76b900); // Zone B: Target Drop Zone (NVIDIA Green)
+
+    // =========================================================================
+    // 2. SIM-TO-REAL WORKCELL ENTITIES & ARTICULATED FORKLIFT PHYSICS
+    // =========================================================================
+    const gltfLoader = new GLTFLoader();
+    const loadedCache = new Map();
+
+    function loadGLB(url) {
+      if (loadedCache.has(url)) {
+        return Promise.resolve(loadedCache.get(url).clone(true));
+      }
+      return new Promise((resolve, reject) => {
+        gltfLoader.load(
+          url,
+          (gltf) => {
+            gltf.scene.traverse((c) => {
+              if (c.isMesh) {
+                c.castShadow = true;
+                c.receiveShadow = true;
+              }
+            });
+            loadedCache.set(url, gltf.scene);
+            resolve(gltf.scene.clone(true));
+          },
+          undefined,
+          reject
+        );
+      });
+    }
+
+    // Articulated Forklift State
+    const forklift = {
+      root: new THREE.Group(),
+      forkGroup: new THREE.Group(),
+      wheels: [],
+      rudder: null,
+      x: 0.0,
+      y: 0.0,
+      vy: 0.0,
+      z: -1.2,
+      yaw: 0.0,         // Facing +Z towards Zone A pallet
+      speed: 0.0,       // m/s along local +Z
+      steer: 0.0,       // radians
+      forkHeight: 0.02, // meters (0.00 to 1.15)
+      targetForkHeight: 0.02,
+      baseMass: 245.1,
+      carriedPallet: null,
+      pitch: 0.0
+    };
+    scene.add(forklift.root);
+
+    // Autonomous Mobile Robot (AMR: robotics_small_bot_a01)
+    const amrBot = {
+      root: new THREE.Group(),
+      sweeps: [],
+      wheels: [],
+      angle: 0,
+      radius: 3.6,
+      speed: 0.45,
+      y: 0,
+      vy: 0,
+      pausedByObstacle: false
+    };
+    scene.add(amrBot.root);
+
+    // Dynamic Rigid Bodies in Workcell (Pallets, Cargo Boxes, Pallet Jack, Spawned Assets)
+    const dynamicBodies = [];
+
+    async function buildWorkcellScene() {
+      const overlay = document.getElementById('loading-overlay');
+      overlay.style.display = 'flex';
+
+      try {
+        // 1. Load & Rig Articulated Orange Forklift
+        const fkModel = await loadGLB('./assets/vehicle_forklift_orange_a01.glb');
+        forklift.root.clear();
+        forklift.forkGroup.clear();
+        forklift.wheels = [];
+        forklift.rudder = null;
+
+        const children = [...fkModel.children];
+        children.forEach((ch) => {
+          const nm = (ch.name || '').toLowerCase();
+          if (nm.includes('fork')) {
+            // Forks & fork carriage rollers move vertically together!
+            forklift.forkGroup.add(ch);
+          } else {
+            forklift.root.add(ch);
+            if (nm.includes('wheel')) forklift.wheels.push(ch);
+            if (nm.includes('rudder') || nm.includes('handle')) forklift.rudder = ch;
+          }
+        });
+        forklift.root.add(forklift.forkGroup);
+
+        // 2. Load Autonomous Mobile Robot (AMR)
+        const botModel = await loadGLB('./assets/robotics_small_bot_a01.glb');
+        amrBot.root.clear();
+        amrBot.sweeps = [];
+        amrBot.wheels = [];
+        botModel.traverse((c) => {
+          const nm = (c.name || '').toLowerCase();
+          if (nm.includes('sweep')) amrBot.sweeps.push(c);
+          if (nm.includes('wheel')) amrBot.wheels.push(c);
+        });
+        amrBot.root.add(botModel);
+
+        // 3. Load Pallets, Cargo Boxes, and Heavy-Duty Pallet Jack
+        const [palletMesh1, boxMesh1, boxMesh2, palletMesh2, pjMesh] = await Promise.all([
+          loadGLB('./assets/pallet_a01.glb'),
+          loadGLB('./assets/box_cardboard_a01.glb'),
+          loadGLB('./assets/box_cardboard_a01.glb'),
+          loadGLB('./assets/pallet_a01.glb'),
+          loadGLB('./assets/palletJack_heavyDuty_a01.glb')
+        ]);
+
+        // Clear existing dynamic bodies
+        dynamicBodies.forEach(b => scene.remove(b.group));
+        dynamicBodies.length = 0;
+
+        // Primary Pallet + 2 Stacked Cargo Boxes at Zone A (0.0, 2.2)
+        const palletGroup1 = new THREE.Group();
+        palletGroup1.add(palletMesh1);
+        boxMesh1.position.set(-0.18, 0.209, 0.0);
+        boxMesh2.position.set(0.20, 0.209, 0.04);
+        boxMesh2.rotation.y = 0.15;
+        palletGroup1.add(boxMesh1);
+        palletGroup1.add(boxMesh2);
+        scene.add(palletGroup1);
+
+        dynamicBodies.push({
+          id: 'pallet_cargo_main',
+          label: '적재 팔레트 #1 (화물 2박스)',
+          group: palletGroup1,
+          x: 0.0, y: 0.0, z: 2.2,
+          vx: 0, vy: 0, vz: 0,
+          yaw: 0,
+          mass: 42.5, // 18.5kg pallet + 24kg boxes
+          restitution: 0.22,
+          radius: 0.65,
+          isPallet: true
+        });
+
+        // Second Pallet at (-2.2, 1.5)
+        const palletGroup2 = new THREE.Group();
+        palletGroup2.add(palletMesh2);
+        scene.add(palletGroup2);
+        dynamicBodies.push({
+          id: 'pallet_2',
+          label: '예비 물류 팔레트 #2',
+          group: palletGroup2,
+          x: -2.2, y: 0.0, z: 1.5,
+          vx: 0, vy: 0, vz: 0,
+          yaw: 0.2,
+          mass: 18.5,
+          restitution: 0.25,
+          radius: 0.65,
+          isPallet: true
+        });
+
+        // Heavy-Duty Pallet Jack at (-2.2, -0.8)
+        const pjGroup = new THREE.Group();
+        pjGroup.add(pjMesh);
+        scene.add(pjGroup);
+        dynamicBodies.push({
+          id: 'palletJack_heavyDuty_a01',
+          label: '중량물 핸드 팔레트 자키',
+          group: pjGroup,
+          x: -2.2, y: 0.0, z: -0.8,
+          vx: 0, vy: 0, vz: 0,
+          yaw: 0.4,
+          mass: 78.5,
+          restitution: 0.18,
+          radius: 0.65,
+          isPallet: false
+        });
+
+        resetWorkcellPositions();
+      } catch (e) {
+        console.error('Workcell init error:', e);
+      } finally {
+        overlay.style.display = 'none';
+      }
+    }
+
+    function resetWorkcellPositions() {
+      aiMission.active = false;
+      aiMission.step = 'IDLE';
+      updateAIMissionButton();
+
+      forklift.x = 0.0;
+      forklift.y = 0.0;
+      forklift.vy = 0.0;
+      forklift.z = -1.1;
+      forklift.yaw = 0.0;
+      forklift.speed = 0.0;
+      forklift.steer = 0.0;
+      forklift.forkHeight = 0.02;
+      forklift.targetForkHeight = 0.02;
+      forklift.carriedPallet = null;
+      document.getElementById('fork-slider').value = 0.02;
+
+      if (dynamicBodies[0]) {
+        Object.assign(dynamicBodies[0], { x: 0.0, y: 0.0, z: 2.2, vx: 0, vy: 0, vz: 0, yaw: 0 });
+      }
+      if (dynamicBodies[1]) {
+        Object.assign(dynamicBodies[1], { x: -2.2, y: 0.0, z: 1.5, vx: 0, vy: 0, vz: 0, yaw: 0.2 });
+      }
+      if (dynamicBodies[2]) {
+        Object.assign(dynamicBodies[2], { x: -2.2, y: 0.0, z: -0.8, vx: 0, vy: 0, vz: 0, yaw: 0.4 });
+      }
+    }
+
+    function triggerGlobalGravityDrop() {
+      forklift.y = 1.8;
+      forklift.vy = 0;
+      amrBot.y = 2.2;
+      amrBot.vy = 0;
+      dynamicBodies.forEach((b, i) => {
+        if (b !== forklift.carriedPallet) {
+          b.y = 2.0 + i * 0.4;
+          b.vy = 0;
+        }
+      });
+    }
+
+    // Spawn any pamphlet asset into the live workcell!
+    let spawnCounter = 0;
+    async function spawnAssetIntoWorkcell(assetId) {
+      const item = catalog.find(x => x.id === assetId) || { id: assetId, name_ko: assetId, mass_kg: 25.0, restitution: 0.3 };
+      const overlay = document.getElementById('loading-overlay');
+      const loadingText = document.getElementById('loading-text');
+
+      let glbUrl = `./assets/${assetId}.glb`;
+      if (!readySet.has(assetId)) {
+        overlay.style.display = 'flex';
+        loadingText.textContent = `Hugging Face에서 [${item.name_ko}] 다운로드 & 로컬 3D 변환 중...`;
+        try {
+          const res = await fetch(`/api/convert?id=${encodeURIComponent(assetId)}`, { method: 'POST' });
+          const data = await res.json();
+          if (!data.ok) throw new Error(data.error || '변환 실패');
+          if (data.disk) updateDiskUI(data.disk);
+          readySet.add(assetId);
+          buildCategoryTabs();
+          renderCatalogGrid(false);
+          glbUrl = data.glb;
+        } catch (err) {
+          overlay.style.display = 'none';
+          alert(`클라우드 변환 안내: ${err.message}`);
+          return;
+        }
+      }
+
+      overlay.style.display = 'flex';
+      loadingText.textContent = `[${item.name_ko}] 작업장 물리 엔진에 스폰 중...`;
+      try {
+        const model = await loadGLB(glbUrl);
+        // Normalize bottom to Y=0 and keep realistic scale
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
+        const maxD = Math.max(size.x, size.y, size.z, 0.001);
+        if (maxD > 3.5 || maxD < 0.25) {
+          model.scale.setScalar(1.2 / maxD);
+        }
+        const box2 = new THREE.Box3().setFromObject(model);
+        const center = box2.getCenter(new THREE.Vector3());
+        model.position.set(-center.x, -box2.min.y, -center.z);
+
+        const grp = new THREE.Group();
+        grp.add(model);
+        scene.add(grp);
+
+        const angle = (spawnCounter * 0.85) % (Math.PI * 2);
+        const rad = 1.6 + (spawnCounter % 3) * 0.7;
+        spawnCounter++;
+
+        dynamicBodies.push({
+          id: `${assetId}_${spawnCounter}`,
+          label: item.name_ko,
+          group: grp,
+          x: Math.cos(angle) * rad,
+          y: 2.6,
+          z: Math.sin(angle) * rad,
+          vx: 0, vy: 0, vz: 0,
+          yaw: angle,
+          mass: item.mass_kg || 25.0,
+          restitution: item.restitution || 0.3,
+          radius: 0.55,
+          isPallet: assetId.toLowerCase().includes('pallet')
+        });
+      } finally {
+        overlay.style.display = 'none';
+      }
+    }
+
+    // =========================================================================
+    // 3. KEYBOARD TELEOP & SIM-TO-REAL AUTONOMOUS AI MISSION CONTROLLER
+    // =========================================================================
+    const keys = {};
+    window.addEventListener('keydown', (e) => {
+      if (document.activeElement === document.getElementById('search-input')) return;
+      keys[e.code] = true;
+      if (e.code === 'Space') {
+        e.preventDefault();
+        triggerGlobalGravityDrop();
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      keys[e.code] = false;
+    });
+
+    const forkSlider = document.getElementById('fork-slider');
+    forkSlider.addEventListener('input', (e) => {
+      forklift.targetForkHeight = parseFloat(e.target.value);
+    });
+
+    // Autonomous Sim-to-Real Pick-and-Place State Machine
+    const aiMission = {
+      active: false,
+      step: 'IDLE',
+      timer: 0
+    };
+
+    const aiBtn = document.getElementById('ai-mission-btn');
+    function updateAIMissionButton() {
+      if (aiMission.active) {
+        aiBtn.classList.add('running');
+        aiBtn.textContent = `⏹️ AI 자율 실험 중지 (${aiMission.step})`;
+      } else {
+        aiBtn.classList.remove('running');
+        aiBtn.textContent = '🤖 AI 자율 피킹·하역 실험 시작';
+      }
+    }
+
+    aiBtn.addEventListener('click', () => {
+      if (aiMission.active) {
+        aiMission.active = false;
+        aiMission.step = 'IDLE';
+        forklift.speed = 0;
+        updateAIMissionButton();
+      } else {
+        resetWorkcellPositions();
+        aiMission.active = true;
+        aiMission.step = '1_INSERT_FORKS';
+        aiMission.timer = 0;
+        updateAIMissionButton();
+      }
+    });
+
+    document.getElementById('drop-all-btn').addEventListener('click', (e) => {
+      e.target.blur();
+      triggerGlobalGravityDrop();
+    });
+    document.getElementById('reset-sim-btn').addEventListener('click', (e) => {
+      e.target.blur();
+      resetWorkcellPositions();
+    });
+
+    // Camera Mode Toggle
+    let cameraMode = 'orbit';
+    const camOrbitBtn = document.getElementById('cam-orbit-btn');
+    const camChaseBtn = document.getElementById('cam-chase-btn');
+    camOrbitBtn.addEventListener('click', () => {
+      cameraMode = 'orbit';
+      camOrbitBtn.classList.add('active');
+      camChaseBtn.classList.remove('active');
+    });
+    camChaseBtn.addEventListener('click', () => {
+      cameraMode = 'chase';
+      camChaseBtn.classList.add('active');
+      camOrbitBtn.classList.remove('active');
+    });
+
+    // Run Autonomous AI Step
+    function stepAutonomousAI(dt) {
+      aiMission.timer += dt;
+      const pallet = dynamicBodies[0];
+      if (!pallet) return;
+
+      if (aiMission.step === '1_INSERT_FORKS') {
+        // Drive straight along +Z into the pallet at (0.0, 2.2) until z = 1.32
+        forklift.targetForkHeight = 0.02;
+        const dz = (pallet.z - 0.85) - forklift.z;
+        const dx = pallet.x - forklift.x;
+        forklift.steer = THREE.MathUtils.clamp(dx * 1.5 - forklift.yaw * 2.0, -0.5, 0.5);
+        if (dz > 0.04) {
+          forklift.speed = Math.min(1.15, Math.max(0.35, dz * 0.9));
+        } else {
+          forklift.speed = 0;
+          forklift.steer = 0;
+          aiMission.step = '2_LIFT_CARGO';
+          aiMission.timer = 0;
+          updateAIMissionButton();
+        }
+      } else if (aiMission.step === '2_LIFT_CARGO') {
+        forklift.speed = 0;
+        forklift.targetForkHeight = 0.48;
+        forkSlider.value = forklift.targetForkHeight;
+        if (forklift.forkHeight >= 0.44) {
+          aiMission.step = '3_DRIVE_TO_DROPZONE';
+          aiMission.timer = 0;
+          updateAIMissionButton();
+        }
+      } else if (aiMission.step === '3_DRIVE_TO_DROPZONE') {
+        // Reverse slightly, turn towards Drop Zone B (2.6, 2.2), and drive there
+        const targetX = 2.6;
+        const targetZ = 1.35;
+        const dx = targetX - forklift.x;
+        const dz = targetZ - forklift.z;
+        const dist = Math.hypot(dx, dz);
+        const desiredYaw = Math.atan2(dx, dz);
+        let yawErr = desiredYaw - forklift.yaw;
+        while (yawErr > Math.PI) yawErr -= Math.PI * 2;
+        while (yawErr < -Math.PI) yawErr += Math.PI * 2;
+
+        if (dist > 0.12) {
+          forklift.steer = THREE.MathUtils.clamp(yawErr * 1.8, -0.65, 0.65);
+          forklift.speed = Math.min(1.25, Math.max(0.4, dist * 0.85));
+        } else {
+          forklift.speed = 0;
+          forklift.steer = 0;
+          aiMission.step = '4_LOWER_PALLET';
+          aiMission.timer = 0;
+          updateAIMissionButton();
+        }
+      } else if (aiMission.step === '4_LOWER_PALLET') {
+        forklift.speed = 0;
+        forklift.targetForkHeight = 0.01;
+        forkSlider.value = 0.01;
+        if (forklift.forkHeight <= 0.03) {
+          aiMission.step = '5_RETRACT_SAFE';
+          aiMission.timer = 0;
+          updateAIMissionButton();
+        }
+      } else if (aiMission.step === '5_RETRACT_SAFE') {
+        forklift.steer = 0;
+        forklift.speed = -0.85;
+        if (aiMission.timer > 1.8) {
+          forklift.speed = 0;
+          aiMission.active = false;
+          aiMission.step = 'MISSION_COMPLETE';
+          updateAIMissionButton();
+        }
+      }
+    }
+
+    // =========================================================================
+    // 4. MAIN PHYSICS SIMULATION LOOP (60Hz Rigid Body + Articulation)
+    // =========================================================================
+    const elMode = document.getElementById('st-mode');
+    const elSpeed = document.getElementById('st-speed');
+    const elFork = document.getElementById('st-fork');
+    const elMass = document.getElementById('st-mass');
+    const elCargo = document.getElementById('cargo-status');
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.04);
+
+      // A. Manual vs Autonomous Forklift Input
+      if (aiMission.active) {
+        stepAutonomousAI(dt);
+        elMode.textContent = `AI AUTO (${aiMission.step})`;
+        elMode.style.color = '#ffb800';
+      } else {
+        elMode.textContent = aiMission.step === 'MISSION_COMPLETE' ? 'MISSION COMPLETE' : 'MANUAL TELEOP';
+        elMode.style.color = '#76b900';
+
+        // Throttle (W/S or Up/Down)
+        const accel = 2.8;
+        if (keys['KeyW'] || keys['ArrowUp']) {
+          forklift.speed = Math.min(2.2, forklift.speed + accel * dt);
+        } else if (keys['KeyS'] || keys['ArrowDown']) {
+          forklift.speed = Math.max(-1.6, forklift.speed - accel * dt);
+        } else {
+          // Rolling resistance & engine braking
+          forklift.speed *= Math.pow(0.08, dt);
+          if (Math.abs(forklift.speed) < 0.01) forklift.speed = 0;
+        }
+
+        // Steering (A/D or Left/Right)
+        const steerRate = 2.2;
+        if (keys['KeyA'] || keys['ArrowLeft']) {
+          forklift.steer = Math.min(0.65, forklift.steer + steerRate * dt);
+        } else if (keys['KeyD'] || keys['ArrowRight']) {
+          forklift.steer = Math.max(-0.65, forklift.steer - steerRate * dt);
+        } else {
+          forklift.steer *= Math.pow(0.05, dt);
+        }
+
+        // Hydraulic Fork Lift (R/F)
+        if (keys['KeyR'] || keys['PageUp']) {
+          forklift.targetForkHeight = Math.min(1.15, forklift.targetForkHeight + 0.55 * dt);
+          forkSlider.value = forklift.targetForkHeight;
+        }
+        if (keys['KeyF'] || keys['PageDown']) {
+          forklift.targetForkHeight = Math.max(0.0, forklift.targetForkHeight - 0.55 * dt);
+          forkSlider.value = forklift.targetForkHeight;
+        }
+      }
+
+      // B. Update Forklift Kinematics & Gravity
+      if (Math.abs(forklift.speed) > 0.01) {
+        forklift.yaw += forklift.steer * (forklift.speed * 0.75) * dt;
+      }
+      const fwdX = Math.sin(forklift.yaw);
+      const fwdZ = Math.cos(forklift.yaw);
+      forklift.x += fwdX * forklift.speed * dt;
+      forklift.z += fwdZ * forklift.speed * dt;
+
+      // Vertical Gravity on Forklift
+      if (forklift.y > 0 || forklift.vy !== 0) {
+        forklift.vy -= 9.81 * dt;
+        forklift.y += forklift.vy * dt;
+        if (forklift.y <= 0) {
+          forklift.y = 0;
+          forklift.vy = -forklift.vy * 0.18;
+          if (Math.abs(forklift.vy) < 0.15) forklift.vy = 0;
+        }
+      }
+
+      // Smooth Hydraulic Fork Movement
+      const prevForkH = forklift.forkHeight;
+      forklift.forkHeight += (forklift.targetForkHeight - forklift.forkHeight) * Math.min(1, 8.0 * dt);
+      forklift.forkGroup.position.y = forklift.forkHeight;
+
+      // Spin Wheels & Turn Rudder Handle
+      forklift.wheels.forEach((w) => {
+        w.rotation.x += (forklift.speed / 0.08) * dt;
+      });
+      if (forklift.rudder) {
+        forklift.rudder.rotation.y = forklift.steer * 0.8;
+      }
+
+      // Fork-Pallet Pickup & Release Physics
+      const forkTipX = forklift.x + fwdX * 0.88;
+      const forkTipZ = forklift.z + fwdZ * 0.88;
+
+      if (!forklift.carriedPallet) {
+        // Check if forks are under any pallet and lifting up
+        for (const b of dynamicBodies) {
+          if (!b.isPallet) continue;
+          const distToFork = Math.hypot(b.x - forkTipX, b.z - forkTipZ);
+          if (distToFork < 0.58 && forklift.forkHeight > 0.04 && prevForkH <= 0.12) {
+            forklift.carriedPallet = b;
+            break;
+          }
+        }
+      } else {
+        // Keep carried pallet locked on the forks unless lowered to ground (<= 0.03m)
+        const cp = forklift.carriedPallet;
+        cp.x = forkTipX;
+        cp.z = forkTipZ;
+        cp.y = forklift.y + Math.max(0, forklift.forkHeight - 0.02);
+        cp.yaw = forklift.yaw;
+        cp.vx = 0;
+        cp.vy = 0;
+        cp.vz = 0;
+        if (forklift.forkHeight <= 0.025) {
+          cp.y = 0;
+          forklift.carriedPallet = null;
+        }
+      }
+
+      // Apply Forklift Transform
+      forklift.root.position.set(forklift.x, forklift.y, forklift.z);
+      forklift.root.rotation.set(0, forklift.yaw, 0);
+
+      // C. Update Dynamic Rigid Bodies (Gravity, Bounce, Forklift Push Collisions)
+      for (const b of dynamicBodies) {
+        if (b !== forklift.carriedPallet) {
+          // Gravity
+          if (b.y > 0 || b.vy !== 0) {
+            b.vy -= 9.81 * dt;
+            b.y += b.vy * dt;
+            if (b.y <= 0) {
+              b.y = 0;
+              b.vy = -b.vy * b.restitution;
+              if (Math.abs(b.vy) < 0.15) b.vy = 0;
+            }
+          }
+
+          // Horizontal push collision with Forklift chassis if forks aren't sliding under a pallet
+          const dx = b.x - (forklift.x + fwdX * 0.45);
+          const dz = b.z - (forklift.z + fwdZ * 0.45);
+          const dist = Math.hypot(dx, dz);
+          const minDist = b.isPallet && forklift.forkHeight < 0.08 ? 0.35 : 0.85;
+          if (dist < minDist && dist > 0.001 && Math.abs(b.y - forklift.y) < 0.8) {
+            const nx = dx / dist;
+            const nz = dz / dist;
+            const overlap = minDist - dist;
+            b.x += nx * overlap * 0.8;
+            b.z += nz * overlap * 0.8;
+            b.vx = nx * Math.abs(forklift.speed) * 0.6;
+            b.vz = nz * Math.abs(forklift.speed) * 0.6;
+          }
+
+          b.x += b.vx * dt;
+          b.z += b.vz * dt;
+          b.vx *= Math.pow(0.04, dt);
+          b.vz *= Math.pow(0.04, dt);
+        }
+
+        b.group.position.set(b.x, b.y, b.z);
+        b.group.rotation.set(0, b.yaw, 0);
+      }
+
+      // D. Update Autonomous Mobile Robot (AMR Patrol + LiDAR Obstacle Stop)
+      const amrX = Math.cos(amrBot.angle) * amrBot.radius;
+      const amrZ = Math.sin(amrBot.angle) * amrBot.radius;
+      const distToForklift = Math.hypot(amrX - forklift.x, amrZ - forklift.z);
+      amrBot.pausedByObstacle = distToForklift < 1.45;
+
+      if (!amrBot.pausedByObstacle) {
+        amrBot.angle += (amrBot.speed / amrBot.radius) * dt;
+        amrBot.sweeps.forEach((s, idx) => {
+          s.rotation.y += (idx % 2 === 0 ? 6.0 : -6.0) * dt;
+        });
+      }
+      if (amrBot.y > 0 || amrBot.vy !== 0) {
+        amrBot.vy -= 9.81 * dt;
+        amrBot.y += amrBot.vy * dt;
+        if (amrBot.y <= 0) {
+          amrBot.y = 0;
+          amrBot.vy = -amrBot.vy * 0.25;
+          if (Math.abs(amrBot.vy) < 0.15) amrBot.vy = 0;
+        }
+      }
+      amrBot.root.position.set(
+        Math.cos(amrBot.angle) * amrBot.radius,
+        amrBot.y,
+        Math.sin(amrBot.angle) * amrBot.radius
+      );
+      amrBot.root.rotation.set(0, -amrBot.angle, 0);
+
+      // E. Camera Chase Mode
+      if (cameraMode === 'chase') {
+        const camTargetX = forklift.x - fwdX * 3.4;
+        const camTargetZ = forklift.z - fwdZ * 3.4;
+        camera.position.lerp(new THREE.Vector3(camTargetX, forklift.y + 2.3, camTargetZ), 5.0 * dt);
+        controls.target.lerp(new THREE.Vector3(forklift.x + fwdX * 0.8, forklift.y + 0.7, forklift.z + fwdZ * 0.8), 8.0 * dt);
+      }
+
+      // F. Telemetry HUD Update
+      const deg = (forklift.steer * 180 / Math.PI).toFixed(1);
+      elSpeed.textContent = `${forklift.speed.toFixed(2)} m/s | ${deg}°`;
+      elFork.textContent = `${forklift.forkHeight.toFixed(2)} m`;
+      const cargoMass = forklift.carriedPallet ? forklift.carriedPallet.mass : 0.0;
+      elMass.textContent = `${(forklift.baseMass + cargoMass).toFixed(1)} kg (+${cargoMass.toFixed(1)} kg)`;
+      if (forklift.carriedPallet) {
+        elCargo.textContent = `✅ [${forklift.carriedPallet.label}] 리프팅 결속됨!`;
+        elCargo.style.color = '#76b900';
+      } else {
+        elCargo.textContent = '포크 대기 중 (팔레트 진입 후 R키 상승 시 적재)';
+        elCargo.style.color = '#9da7b3';
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // =========================================================================
+    // 5. 2,677-ITEM DIGITAL PAMPHLET (CATALOG DASHBOARD)
+    // =========================================================================
+    let catalog = [];
+    let readySet = new Set([
+      'vehicle_forklift_orange_a01',
+      'palletJack_heavyDuty_a01',
+      'robotics_small_bot_a01',
+      'pallet_a01',
+      'box_cardboard_a01'
+    ]);
+    let selectedCat = 'all';
+    let searchQuery = '';
+    let displayLimit = 60;
+    let filteredList = [];
+
+    const catTabsEl = document.getElementById('cat-tabs');
+    const gridEl = document.getElementById('catalog-grid');
+    const showingCountEl = document.getElementById('showing-count');
+    const moreBtn = document.getElementById('more-btn');
+
+    const CATEGORIES = [
+      { id: 'all', label: '전체 품목', icon: '📘' },
+      { id: 'ready', label: '즉시 배치 가능', icon: '⚡' },
+      { id: 'forklift_vehicle', label: '지게차·운반차량', icon: '🚜' },
+      { id: 'robotics', label: '로봇·자동화', icon: '🤖' },
+      { id: 'warehouse', label: '물류·창고·팔레트', icon: '🏭' },
+      { id: 'factory', label: '공장·산업기계', icon: '⚙️' },
+      { id: 'tools_auto', label: '공구·정비·부품', icon: '🔧' },
+      { id: 'medical', label: '의료·병원·연구', icon: '🏥' },
+      { id: 'office_it', label: 'IT·오피스·가구', icon: '🖥️' },
+      { id: 'appliances_misc', label: '가전·청소·소모품', icon: '🏠' },
+      { id: 'food_kitchen', label: '식음료·주방', icon: '🍎' }
+    ];
+
+    const CAT_ICONS = {
+      forklift_vehicle: '🚜',
+      robotics: '🤖',
+      warehouse: '📦',
+      factory: '⚙️',
+      tools_auto: '🔧',
+      medical: '🏥',
+      office_it: '🖥️',
+      appliances_misc: '🏠',
+      food_kitchen: '🍎'
+    };
+
+    function buildCategoryTabs() {
+      catTabsEl.innerHTML = '';
+      CATEGORIES.forEach(c => {
+        let count = 0;
+        if (c.id === 'all') count = catalog.length;
+        else if (c.id === 'ready') count = readySet.size;
+        else count = catalog.filter(x => x.cat_id === c.id).length;
+
+        const btn = document.createElement('button');
+        btn.className = 'cat-tab' + (selectedCat === c.id ? ' active' : '');
+        btn.textContent = `${c.icon} ${c.label} (${count})`;
+        btn.addEventListener('click', () => {
+          selectedCat = c.id;
+          displayLimit = 60;
+          buildCategoryTabs();
+          renderCatalogGrid(true);
+        });
+        catTabsEl.appendChild(btn);
+      });
+    }
+
+    function renderCatalogGrid(resetScroll = false) {
+      const q = searchQuery.trim().toLowerCase();
+      filteredList = catalog.filter(item => {
+        if (selectedCat === 'ready' && !readySet.has(item.id)) return false;
+        if (selectedCat !== 'all' && selectedCat !== 'ready' && item.cat_id !== selectedCat) return false;
+        if (q && !item.id.toLowerCase().includes(q) && !item.name_ko.toLowerCase().includes(q) && !item.cat_label.toLowerCase().includes(q)) {
+          return false;
+        }
+        return true;
+      });
+
+      // Keep installed items and key logistics machinery at the top
+      filteredList.sort((a, b) => {
+        const ar = readySet.has(a.id) ? 1 : 0;
+        const br = readySet.has(b.id) ? 1 : 0;
+        if (ar !== br) return br - ar;
+        const af = (a.id.includes('forklift') || a.id.includes('palletJack') || a.id.includes('robot')) ? 1 : 0;
+        const bf = (b.id.includes('forklift') || b.id.includes('palletJack') || b.id.includes('robot')) ? 1 : 0;
+        if (af !== bf) return bf - af;
+        return a.id.localeCompare(b.id);
+      });
+
+      const slice = filteredList.slice(0, displayLimit);
+      gridEl.innerHTML = '';
+
+      slice.forEach(item => {
+        const isReady = readySet.has(item.id);
+        const icon = CAT_ICONS[item.cat_id] || '📦';
+        const altThumb = `https://huggingface.co/datasets/nvidia/simready-assets/resolve/main/${item.id}/simready_usd/.thumbs/sm_${item.id}_01_thumbnail.png`;
+
+        const card = document.createElement('div');
+        card.className = 'asset-card' + (isReady ? ' is-installed' : '');
+
+        card.innerHTML = `
+          <div class="thumb-wrap">
+            <div class="thumb-fallback">
+              <div class="thumb-fallback-icon">${icon}</div>
+              <div class="thumb-fallback-tag">OpenUSD 3D ASSET</div>
+            </div>
+            <img
+              class="thumb-img"
+              src="${item.thumb}"
+              data-alt="${altThumb}"
+              loading="lazy"
+              alt="${item.id}"
+            />
+            <span class="status-pill ${isReady ? 'pill-ready' : 'pill-cloud'}">${isReady ? '⚡ 설치됨' : '☁️ 클라우드'}</span>
+          </div>
+          <div class="card-body">
+            <div class="card-cat">${item.cat_label}</div>
+            <div class="card-title">${item.name_ko}</div>
+            <div class="card-id">${item.id}</div>
+            <div class="card-specs">⚖️ 질량: ${item.mass_kg}kg · 탄성: ${item.restitution} · PhysX/MuJoCo</div>
+            <div class="card-actions">
+              <button class="btn-load ${isReady ? 'is-ready' : ''}" data-spawn="${item.id}">
+                ${isReady ? '➕ 작업장에 즉시 배치' : '⬇️ 다운로드 & 작업장 배치'}
+              </button>
+              <a class="btn-hf" href="${item.hf_url}" target="_blank" title="Hugging Face 원본 폴더 열기">📦 USD</a>
+            </div>
+          </div>
+        `;
+
+        const imgEl = card.querySelector('.thumb-img');
+        imgEl.addEventListener('error', function onErr() {
+          if (this.dataset.triedAlt !== '1') {
+            this.dataset.triedAlt = '1';
+            this.src = this.dataset.alt;
+          } else {
+            this.style.display = 'none';
+          }
+        });
+
+        card.querySelector('[data-spawn]').addEventListener('click', () => {
+          spawnAssetIntoWorkcell(item.id);
+        });
+
+        gridEl.appendChild(card);
+      });
+
+      if (resetScroll) gridEl.scrollTop = 0;
+      showingCountEl.textContent = `표시 중: ${slice.length} / 검색 결과 ${filteredList.length}종`;
+      moreBtn.style.display = slice.length < filteredList.length ? 'inline-block' : 'none';
+    }
+
+    document.getElementById('search-input').addEventListener('input', (e) => {
+      searchQuery = e.target.value;
+      displayLimit = 60;
+      renderCatalogGrid(true);
+    });
+
+    moreBtn.addEventListener('click', () => {
+      displayLimit += 60;
+      renderCatalogGrid(false);
+    });
+
+    const pamphletEl = document.getElementById('pamphlet');
+    const toggleWidthBtn = document.getElementById('toggle-width-btn');
+    toggleWidthBtn.addEventListener('click', () => {
+      pamphletEl.classList.toggle('expanded');
+      toggleWidthBtn.textContent = pamphletEl.classList.contains('expanded') ? '⇥ 기본 폭으로' : '↔ 팜플렛 넓게 보기';
+      setTimeout(onResize, 260);
+    });
+
+    function updateDiskUI(disk) {
+      if (!disk) return;
+      document.getElementById('free-gb').textContent = disk.free_gb;
+      document.getElementById('cache-mb').textContent = disk.assets_mb;
+      if (Array.isArray(disk.ready_ids)) {
+        readySet = new Set(disk.ready_ids);
+      }
+    }
+
+    document.getElementById('clean-cache-btn').addEventListener('click', async () => {
+      const res = await fetch('/api/clean_cache', { method: 'POST' });
+      const data = await res.json();
+      if (data.ok) {
+        updateDiskUI(data.disk);
+        buildCategoryTabs();
+        renderCatalogGrid(false);
+      }
+    });
+
+    async function init() {
+      try {
+        const [catRes, stRes] = await Promise.all([
+          fetch('./catalog.json'),
+          fetch('/api/status').catch(() => null)
+        ]);
+        catalog = await catRes.json();
+        if (stRes && stRes.ok) {
+          const st = await stRes.json();
+          updateDiskUI(st);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+      buildCategoryTabs();
+      renderCatalogGrid(true);
+      await buildWorkcellScene();
+      animate();
+    }
+
+    init();
+
+    function onResize() {
+      camera.aspect = viewport.clientWidth / viewport.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(viewport.clientWidth, viewport.clientHeight);
+    }
+    window.addEventListener('resize', onResize);
+  </script>
+</body>
+</html>

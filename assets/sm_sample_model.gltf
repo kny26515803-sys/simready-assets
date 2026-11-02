@@ -1,0 +1,184 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "NVIDIA SimReady Minimal Prototype Generator",
+    "extras": {
+      "simready": {
+        "mass_kg": 14.5,
+        "restitution": 0.42,
+        "friction": 0.65,
+        "physics_variant": "PhysX / MuJoCo Ready"
+      }
+    }
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "SimReady_Sample_Scene",
+      "nodes": [
+        0,
+        1
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "SimReady_Base_Chassis",
+      "mesh": 0
+    },
+    {
+      "name": "SimReady_Sensor_Head",
+      "mesh": 1
+    }
+  ],
+  "meshes": [
+    {
+      "name": "ChassisMesh",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1
+          },
+          "indices": 2,
+          "material": 0
+        }
+      ]
+    },
+    {
+      "name": "TurretMesh",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 3,
+            "NORMAL": 1
+          },
+          "indices": 2,
+          "material": 1
+        }
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "name": "NVIDIA_Industrial_Green_PBR",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.46,
+          0.72,
+          0.0,
+          1.0
+        ],
+        "metallicFactor": 0.35,
+        "roughnessFactor": 0.4
+      }
+    },
+    {
+      "name": "Dark_Titanium_Sensor_PBR",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.22,
+          0.25,
+          0.3,
+          1.0
+        ],
+        "metallicFactor": 0.8,
+        "roughnessFactor": 0.25
+      }
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 936,
+      "uri": "data:application/octet-stream;base64,mpkZvwAAAACamRk/mpkZPwAAAACamRk/mpkZP83MTD+amRk/mpkZv83MTD+amRk/mpkZPwAAAACamRm/mpkZvwAAAACamRm/mpkZv83MTD+amRm/mpkZP83MTD+amRm/mpkZv83MTD+amRk/mpkZP83MTD+amRk/mpkZP83MTD+amRm/mpkZv83MTD+amRm/mpkZvwAAAACamRm/mpkZPwAAAACamRm/mpkZPwAAAACamRk/mpkZvwAAAACamRk/mpkZPwAAAACamRk/mpkZPwAAAACamRm/mpkZP83MTD+amRm/mpkZP83MTD+amRk/mpkZvwAAAACamRm/mpkZvwAAAACamRk/mpkZv83MTD+amRk/mpkZv83MTD+amRm/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIA/AAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AAAAAAAAAAAAAIC/AAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAgL8AAAAAAAAAAAAAgL8AAAAAAACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAACAPwAAAAAAAAAAAACAvwAAAAAAAAAAAACAvwAAAAAAAAAAAACAvwAAAAAAAAAAAACAvwAAAAAAAAAAAAABAAIAAAACAAMABAAFAAYABAAGAAcACAAJAAoACAAKAAsADAANAA4ADAAOAA8AEAARABIAEAASABMAFAAVABYAFAAWABcAmpmZvs3MTD+amZk+mpmZPs3MTD+amZk+mpmZPgAAoD+amZk+mpmZvgAAoD+amZk+mpmZPs3MTD+amZm+mpmZvs3MTD+amZm+mpmZvgAAoD+amZm+mpmZPgAAoD+amZm+mpmZvgAAoD+amZk+mpmZPgAAoD+amZk+mpmZPgAAoD+amZm+mpmZvgAAoD+amZm+mpmZvs3MTD+amZm+mpmZPs3MTD+amZm+mpmZPs3MTD+amZk+mpmZvs3MTD+amZk+mpmZPs3MTD+amZk+mpmZPs3MTD+amZm+mpmZPgAAoD+amZm+mpmZPgAAoD+amZk+mpmZvs3MTD+amZm+mpmZvs3MTD+amZk+mpmZvgAAoD+amZk+mpmZvgAAoD+amZm+"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 288,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 288,
+      "byteLength": 288,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 576,
+      "byteLength": 72,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 648,
+      "byteLength": 288,
+      "target": 34962
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 24,
+      "type": "VEC3",
+      "min": [
+        -0.6,
+        0.0,
+        -0.6
+      ],
+      "max": [
+        0.6,
+        0.8,
+        0.6
+      ]
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 24,
+      "type": "VEC3",
+      "min": [
+        -1.0,
+        -1.0,
+        -1.0
+      ],
+      "max": [
+        1.0,
+        1.0,
+        1.0
+      ]
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5123,
+      "count": 36,
+      "type": "SCALAR",
+      "min": [
+        0
+      ],
+      "max": [
+        23
+      ]
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5126,
+      "count": 24,
+      "type": "VEC3",
+      "min": [
+        -0.3,
+        0.8,
+        -0.3
+      ],
+      "max": [
+        0.3,
+        1.25,
+        0.3
+      ]
+    }
+  ]
+}
